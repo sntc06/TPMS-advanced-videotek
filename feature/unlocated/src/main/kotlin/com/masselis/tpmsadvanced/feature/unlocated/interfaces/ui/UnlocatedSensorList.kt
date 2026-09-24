@@ -24,6 +24,7 @@ import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedButton
+import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.ShapeDefaults
 import androidx.compose.material3.Text
 import androidx.compose.material3.minimumInteractiveComponentSize
@@ -33,6 +34,7 @@ import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.saveable.rememberSaveable
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.RectangleShape
@@ -54,6 +56,7 @@ import androidx.compose.ui.unit.Dp.Companion.Hairline
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.lifecycle.viewmodel.compose.viewModel
+import com.masselis.tpmsadvanced.core.common.now
 import com.masselis.tpmsadvanced.core.ui.restartApp
 import com.masselis.tpmsadvanced.data.unit.model.PressureUnit
 import com.masselis.tpmsadvanced.data.unit.model.PressureUnit.BAR
@@ -247,6 +250,8 @@ private fun Searching(
                 currentVehicleName = state.currentVehicleName,
                 bindingFinished = bindingFinished
             )
+
+        manualMacEntry(onBind = setTyreToBind)
     }
     if (tyreToBind != null)
         BindDialog(
@@ -255,6 +260,65 @@ private fun Searching(
             onBind = { setTyreToBind(null) },
             onDismissRequest = { setTyreToBind(null) },
         )
+}
+
+/**
+ * Lets the user bind a sensor by typing its full Bluetooth MAC address instead of waiting for it
+ * to be seen over the air. Only the last 3 bytes are used to compute the sensor id (the same way
+ * [com.masselis.tpmsadvanced.data.vehicle.interfaces.impl.RawVSafe] derives it from a scanned
+ * advertisement), so the first 3 bytes (the OUI) don't need to be accurate. Useful to test binding
+ * without having the physical sensor at hand, or to pre-bind a sensor before it's ever scanned.
+ */
+private fun LazyListScope.manualMacEntry(
+    onBind: (Tyre) -> Unit,
+) {
+    item { Spacer(Modifier.height(24.dp)) }
+    item {
+        Text(
+            text = "Or bind by typing a MAC address:",
+            fontSize = 12.sp,
+        )
+    }
+    item { Spacer(Modifier.height(8.dp)) }
+    item {
+        var macAddress by rememberSaveable { mutableStateOf("") }
+        val sensorId = remember(macAddress) { macAddress.toSensorIdOrNull() }
+        Row(
+            verticalAlignment = Alignment.CenterVertically,
+            modifier = Modifier.fillMaxWidth()
+        ) {
+            OutlinedTextField(
+                value = macAddress,
+                onValueChange = { macAddress = it },
+                label = { Text("AA:BB:CC:DD:EE:FF") },
+                isError = macAddress.isNotEmpty() && sensorId == null,
+                singleLine = true,
+                modifier = Modifier
+                    .weight(1f)
+                    .testTag(UnlocatedSensorListTags.manualMacAddressField)
+            )
+            Spacer(Modifier.width(8.dp))
+            Button(
+                enabled = sensorId != null,
+                onClick = {
+                    onBind(
+                        Tyre.Unlocated(
+                            timestamp = now(),
+                            rssi = 0,
+                            sensorId = sensorId!!,
+                            pressure = 0f.bar,
+                            temperature = 0f.celsius,
+                            battery = 0u,
+                            isAlarm = false,
+                        )
+                    )
+                },
+                modifier = Modifier.testTag(UnlocatedSensorListTags.manualMacAddressBindButton)
+            ) {
+                Text("Bind")
+            }
+        }
+    }
 }
 
 private fun State.Search.computeRoundedTopId() = when (this) {
@@ -849,4 +913,6 @@ internal object UnlocatedSensorListTags {
     fun tyreCell(sensorId: Int) = "UnlocatedSensorListTags_tyreCell_$sensorId"
     fun boundCell(sensorId: Int) = "UnlocatedSensorListTags_boundCell_$sensorId"
     const val bindingFinishedGoBackButton = "UnlocatedSensorListTags_bindingFinishedGoBackButton"
+    const val manualMacAddressField = "UnlocatedSensorListTags_manualMacAddressField"
+    const val manualMacAddressBindButton = "UnlocatedSensorListTags_manualMacAddressBindButton"
 }
