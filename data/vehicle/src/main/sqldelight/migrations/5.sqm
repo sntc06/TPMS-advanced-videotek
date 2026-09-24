@@ -1,0 +1,9 @@
+CREATE TABLE TyreLog(
+    id INTEGER NOT NULL PRIMARY KEY,
+    timestamp REAL NOT NULL,
+    sensorId INTEGER NOT NULL,
+    vehicleName TEXT NOT NULL,
+    pressure REAL NOT NULL,
+    temperature REAL NOT NULL,
+    battery INTEGER NOT NULL
+);

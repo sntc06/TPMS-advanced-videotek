@@ -16,6 +16,7 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.unit.dp
 import com.masselis.tpmsadvanced.BuildConfig
+import com.masselis.tpmsadvanced.feature.main.interfaces.composable.LogSettings
 import com.masselis.tpmsadvanced.feature.main.interfaces.composable.VehicleSettings
 import com.masselis.tpmsadvanced.feature.unit.interfaces.UnitsSettings
 import com.masselis.tpmsadvanced.core.ui.Separator
@@ -35,6 +36,8 @@ internal fun Settings(
         // backgroundSettings = { AutomaticBackgroundSettings(it) }
         Modifier.testTag(vehicle)
     )
+    Separator()
+    LogSettings()
     Separator()
     Box(Modifier.fillMaxWidth()) {
         Text(

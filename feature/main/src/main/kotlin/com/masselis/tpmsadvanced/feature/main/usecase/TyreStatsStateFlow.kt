@@ -48,21 +48,27 @@ public class TyreStatsStateFlow internal constructor(
                 atmosphere.pressure,
                 pressureUnit,
                 atmosphere.temperature,
-                temperatureUnit
+                temperatureUnit,
+                atmosphere.battery,
+                atmosphere.timestamp,
             ) else
                 when (atmosphere.temperature.celsius) {
                     in Float.NEGATIVE_INFINITY..highTemp.celsius -> State.Normal(
                         atmosphere.pressure,
                         pressureUnit,
                         atmosphere.temperature,
-                        temperatureUnit
+                        temperatureUnit,
+                        atmosphere.battery,
+                        atmosphere.timestamp,
                     )
 
                     in highTemp.celsius..Float.POSITIVE_INFINITY -> State.Alerting(
                         atmosphere.pressure,
                         pressureUnit,
                         atmosphere.temperature,
-                        temperatureUnit
+                        temperatureUnit,
+                        atmosphere.battery,
+                        atmosphere.timestamp,
                     )
 
                     else -> error("Unreachable state")
@@ -93,6 +99,8 @@ public class TyreStatsStateFlow internal constructor(
             public val pressureUnit: PressureUnit,
             public val temperature: Temperature,
             public val temperatureUnit: TemperatureUnit,
+            public val battery: UShort,
+            public val timestamp: Double,
         ) : State()
 
         // Show the read values from the tyre in red
@@ -102,6 +110,8 @@ public class TyreStatsStateFlow internal constructor(
             public val pressureUnit: PressureUnit,
             public val temperature: Temperature,
             public val temperatureUnit: TemperatureUnit,
+            public val battery: UShort,
+            public val timestamp: Double,
         ) : State()
     }
 }

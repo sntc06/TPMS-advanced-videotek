@@ -1,13 +1,17 @@
 package com.masselis.tpmsadvanced.feature.main.ioc
 
+import android.content.Context
 import com.masselis.tpmsadvanced.core.common.appGraph
 import com.masselis.tpmsadvanced.data.app.interfaces.AppPreferences
 import com.masselis.tpmsadvanced.data.vehicle.interfaces.BluetoothLeScanner
+import com.masselis.tpmsadvanced.data.vehicle.interfaces.LogPreferences
+import com.masselis.tpmsadvanced.data.vehicle.interfaces.TyreLogDatabase
 import com.masselis.tpmsadvanced.data.vehicle.interfaces.VehicleDatabase
 import com.masselis.tpmsadvanced.data.vehicle.usecase.DemoOrBleScannerUseCase
 import com.masselis.tpmsadvanced.feature.main.interfaces.viewmodel.DemoModeSwitchViewModel
 import com.masselis.tpmsadvanced.feature.main.interfaces.viewmodel.PreconditionsViewModel
 import com.masselis.tpmsadvanced.feature.main.interfaces.viewmodel.impl.CurrentVehicleDropdownViewModelImpl
+import com.masselis.tpmsadvanced.feature.main.interfaces.viewmodel.impl.LogSettingsViewModel
 import com.masselis.tpmsadvanced.feature.main.ioc.vehicle.VehicleComponent
 import com.masselis.tpmsadvanced.feature.main.usecase.CurrentVehicleUseCase
 import com.masselis.tpmsadvanced.feature.main.usecase.NoveltyUseCase
@@ -60,6 +64,13 @@ public interface Bindings {
     private fun demoModeSwitchViewModel(demoOrBleScannerUseCase: DemoOrBleScannerUseCase): DemoModeSwitchViewModel =
         DemoModeSwitchViewModel(demoOrBleScannerUseCase)
 
+    @Provides
+    private fun logSettingsViewModel(
+        logPreferences: LogPreferences,
+        tyreLogDatabase: TyreLogDatabase,
+        context: Context,
+    ): LogSettingsViewModel = LogSettingsViewModel(logPreferences, tyreLogDatabase, context)
+
 
     public val featureMainInternal: Internal
 
@@ -68,7 +79,8 @@ public interface Bindings {
         internal val vehicleComponentCache: () -> VehicleComponentCacheUseCase,
         internal val preconditionsViewModel: () -> PreconditionsViewModel,
         internal val currentVehicleDropdownViewModel: CurrentVehicleDropdownViewModelImpl.Factory,
-        internal val demoModeSwitchViewModel: () -> DemoModeSwitchViewModel
+        internal val demoModeSwitchViewModel: () -> DemoModeSwitchViewModel,
+        internal val logSettingsViewModel: () -> LogSettingsViewModel,
     )
 
     public companion object : Bindings by appGraph as Bindings {
@@ -78,5 +90,6 @@ public interface Bindings {
             get() = featureMainInternal.currentVehicleDropdownViewModel
 
         internal fun DemoModeSwitchViewModel() = featureMainInternal.demoModeSwitchViewModel()
+        internal fun LogSettingsViewModel() = featureMainInternal.logSettingsViewModel()
     }
 }

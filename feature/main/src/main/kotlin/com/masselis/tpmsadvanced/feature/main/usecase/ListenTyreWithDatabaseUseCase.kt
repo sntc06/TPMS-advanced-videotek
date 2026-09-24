@@ -2,7 +2,9 @@ package com.masselis.tpmsadvanced.feature.main.usecase
 
 import com.masselis.tpmsadvanced.core.common.dematerializeCompletion
 import com.masselis.tpmsadvanced.core.common.materializeCompletion
+import com.masselis.tpmsadvanced.data.vehicle.interfaces.LogPreferences
 import com.masselis.tpmsadvanced.data.vehicle.interfaces.TyreDatabase
+import com.masselis.tpmsadvanced.data.vehicle.interfaces.TyreLogDatabase
 import com.masselis.tpmsadvanced.data.vehicle.model.Tyre
 import com.masselis.tpmsadvanced.data.vehicle.model.Vehicle
 import com.masselis.tpmsadvanced.data.vehicle.model.Vehicle.Kind.Location
@@ -20,6 +22,8 @@ internal interface ListenTyreWithDatabaseUseCase : ListenTyreUseCase {
         vehicle: Vehicle,
         location: Location,
         tyreDatabase: TyreDatabase,
+        tyreLogDatabase: TyreLogDatabase,
+        logPreferences: LogPreferences,
         listenTyreUseCase: ListenTyreUseCase,
         scope: CoroutineScope,
     ) : ListenTyreWithDatabaseUseCase {
@@ -27,6 +31,17 @@ internal interface ListenTyreWithDatabaseUseCase : ListenTyreUseCase {
         private val flow = listenTyreUseCase
             .listen()
             .onEach { tyre -> tyreDatabase.insert(tyre, vehicle.uuid) }
+            .onEach { tyre ->
+                if (logPreferences.enabled.value)
+                    tyreLogDatabase.insert(
+                        tyre.timestamp,
+                        tyre.sensorId,
+                        vehicle.name,
+                        tyre.pressure,
+                        tyre.temperature,
+                        tyre.battery,
+                    )
+            }
             .materializeCompletion()
             .shareIn(scope, WhileSubscribed())
             .dematerializeCompletion()

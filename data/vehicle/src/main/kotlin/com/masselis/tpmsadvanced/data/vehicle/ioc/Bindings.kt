@@ -1,5 +1,6 @@
 package com.masselis.tpmsadvanced.data.vehicle.ioc
 
+import android.content.Context
 import androidx.sqlite.db.SupportSQLiteDatabase
 import app.cash.sqldelight.ColumnAdapter
 import app.cash.sqldelight.EnumColumnAdapter
@@ -12,8 +13,10 @@ import com.masselis.tpmsadvanced.data.vehicle.Database
 import com.masselis.tpmsadvanced.data.vehicle.Sensor
 import com.masselis.tpmsadvanced.data.vehicle.Tyre
 import com.masselis.tpmsadvanced.data.vehicle.Vehicle
+import com.masselis.tpmsadvanced.data.vehicle.interfaces.LogPreferences
 import com.masselis.tpmsadvanced.data.vehicle.interfaces.SensorDatabase
 import com.masselis.tpmsadvanced.data.vehicle.interfaces.TyreDatabase
+import com.masselis.tpmsadvanced.data.vehicle.interfaces.TyreLogDatabase
 import com.masselis.tpmsadvanced.data.vehicle.interfaces.VehicleDatabase
 import com.masselis.tpmsadvanced.data.vehicle.interfaces.afterVersion3
 import com.masselis.tpmsadvanced.data.vehicle.model.Pressure
@@ -41,6 +44,13 @@ public interface Bindings {
 
     @Provides
     private fun tyreDatabase(database: Database): TyreDatabase = TyreDatabase(database)
+
+    @Provides
+    private fun tyreLogDatabase(database: Database): TyreLogDatabase = TyreLogDatabase(database)
+
+    @Provides
+    @SingleIn(AppScope::class)
+    private fun logPreferences(context: Context): LogPreferences = LogPreferences(context)
 
     @Provides
     private fun uuidAdapter(): ColumnAdapter<UUID, String> = object : ColumnAdapter<UUID, String> {

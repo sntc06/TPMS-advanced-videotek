@@ -1,0 +1,22 @@
+CREATE TABLE TyreLog(
+    id INTEGER NOT NULL PRIMARY KEY,
+    timestamp REAL NOT NULL,
+    sensorId INTEGER NOT NULL,
+    vehicleName TEXT NOT NULL,
+    pressure REAL NOT NULL,
+    temperature REAL NOT NULL,
+    battery INTEGER NOT NULL
+);
+
+insert:
+INSERT INTO TyreLog (timestamp, sensorId, vehicleName, pressure, temperature, battery)
+VALUES (?, ?, ?, ?, ?, ?);
+
+selectAll:
+SELECT * FROM TyreLog ORDER BY timestamp ASC;
+
+deleteAll:
+DELETE FROM TyreLog;
+
+count:
+SELECT COUNT(*) FROM TyreLog;

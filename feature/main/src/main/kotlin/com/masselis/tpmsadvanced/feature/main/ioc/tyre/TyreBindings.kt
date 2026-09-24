@@ -2,8 +2,10 @@ package com.masselis.tpmsadvanced.feature.main.ioc.tyre
 
 import com.masselis.tpmsadvanced.data.unit.interfaces.UnitPreferences
 import com.masselis.tpmsadvanced.data.vehicle.interfaces.BluetoothLeScanner
+import com.masselis.tpmsadvanced.data.vehicle.interfaces.LogPreferences
 import com.masselis.tpmsadvanced.data.vehicle.interfaces.SensorDatabase
 import com.masselis.tpmsadvanced.data.vehicle.interfaces.TyreDatabase
+import com.masselis.tpmsadvanced.data.vehicle.interfaces.TyreLogDatabase
 import com.masselis.tpmsadvanced.data.vehicle.interfaces.VehicleDatabase
 import com.masselis.tpmsadvanced.data.vehicle.model.Vehicle
 import com.masselis.tpmsadvanced.data.vehicle.model.Vehicle.Kind.Location
@@ -62,6 +64,8 @@ public interface TyreBindings {
         vehicle: Vehicle,
         location: Location,
         tyreDatabase: TyreDatabase,
+        tyreLogDatabase: TyreLogDatabase,
+        logPreferences: LogPreferences,
         listenTyreUseCase: ListenTyreSmartDutyUseCase,
         demoOrBleScannerUseCase: DemoOrBleScannerUseCase,
         @VehicleLifecycle scope: CoroutineScope,
@@ -75,6 +79,8 @@ public interface TyreBindings {
                 vehicle,
                 location,
                 tyreDatabase,
+                tyreLogDatabase,
+                logPreferences,
                 listenTyreUseCase,
                 scope
             )

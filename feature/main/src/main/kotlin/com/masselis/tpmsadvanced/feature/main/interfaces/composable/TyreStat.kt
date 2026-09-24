@@ -16,6 +16,8 @@ import androidx.compose.ui.draw.alpha
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.sp
+import com.masselis.tpmsadvanced.core.common.now
+import com.masselis.tpmsadvanced.core.ui.relativeTimeSpanString
 import com.masselis.tpmsadvanced.core.ui.viewModel
 import com.masselis.tpmsadvanced.data.unit.model.PressureUnit
 import com.masselis.tpmsadvanced.data.unit.model.TemperatureUnit
@@ -55,17 +57,25 @@ private fun TyreStat(
     state: State,
     modifier: Modifier = Modifier,
 ) {
-    val (pressure, temperature) = when (val state = state) {
-        State.NotDetected -> null to null
-        is State.Normal -> Pair(
-            Pair(state.pressure, state.pressureUnit),
-            Pair(state.temperature, state.temperatureUnit)
-        )
-
-        is State.Alerting -> Pair(
-            Pair(state.pressure, state.pressureUnit),
-            Pair(state.temperature, state.temperatureUnit)
-        )
+    val pressure = when (val state = state) {
+        State.NotDetected -> null
+        is State.Normal -> Pair(state.pressure, state.pressureUnit)
+        is State.Alerting -> Pair(state.pressure, state.pressureUnit)
+    }
+    val temperature = when (val state = state) {
+        State.NotDetected -> null
+        is State.Normal -> Pair(state.temperature, state.temperatureUnit)
+        is State.Alerting -> Pair(state.temperature, state.temperatureUnit)
+    }
+    val battery = when (val state = state) {
+        State.NotDetected -> null
+        is State.Normal -> state.battery
+        is State.Alerting -> state.battery
+    }
+    val timestamp = when (val state = state) {
+        State.NotDetected -> null
+        is State.Normal -> state.timestamp
+        is State.Alerting -> state.timestamp
     }
     val color = when (state) {
         State.NotDetected, is State.Normal -> MaterialTheme.colorScheme.onSurface
@@ -115,8 +125,24 @@ private fun TyreStat(
             color = color,
             modifier = Modifier.align(alignment),
         )
+        Text(
+            battery?.let { "%.1fV".format(it.toInt() / VOLTAGE_UNITS_PER_VOLT) } ?: "-.-V",
+            maxLines = 1,
+            fontSize = 12.sp,
+            color = color,
+            modifier = Modifier.align(alignment),
+        )
+        Text(
+            timestamp?.let { relativeTimeSpanString(it) } ?: "",
+            maxLines = 1,
+            fontSize = 12.sp,
+            color = color,
+            modifier = Modifier.align(alignment),
+        )
     }
 }
+
+private const val VOLTAGE_UNITS_PER_VOLT = 10f
 
 
 @Preview
@@ -138,7 +164,9 @@ internal fun TyreStatNormalPreview() {
             State.Normal(
                 2f.bar,
                 PressureUnit.BAR, 30f.celsius,
-                TemperatureUnit.CELSIUS
+                TemperatureUnit.CELSIUS,
+                battery = 28u,
+                timestamp = now(),
             ),
     )
 }
@@ -152,7 +180,9 @@ internal fun TyreStatAlertingPreview() {
         state = State.Alerting(
             0.5f.bar,
             PressureUnit.BAR, 150f.celsius,
-            TemperatureUnit.CELSIUS
+            TemperatureUnit.CELSIUS,
+            battery = 20u,
+            timestamp = now(),
         ),
     )
 }

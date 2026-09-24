@@ -14,7 +14,8 @@ public class TyreAtmosphereUseCase internal constructor(
             TyreAtmosphere(
                 record.timestamp,
                 if (record.isAlarm) 0f.kpa else record.pressure,
-                record.temperature
+                record.temperature,
+                record.battery,
             )
         }
 }

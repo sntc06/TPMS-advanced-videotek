@@ -8,6 +8,7 @@ import androidx.test.core.app.ApplicationProvider
 import androidx.test.ext.junit.runners.AndroidJUnit4
 import androidx.test.platform.app.InstrumentationRegistry.getInstrumentation
 import com.masselis.tpmsadvanced.core.common.Fraction
+import com.masselis.tpmsadvanced.core.common.now
 import com.masselis.tpmsadvanced.data.unit.model.PressureUnit.BAR
 import com.masselis.tpmsadvanced.data.unit.model.TemperatureUnit.CELSIUS
 import com.masselis.tpmsadvanced.data.vehicle.model.Pressure.CREATOR.bar
@@ -84,7 +85,7 @@ internal class VehicleTemplateTest {
     fun alertingTyreShowsItsLocationAndFormattedPressureWithTemperature() {
         singleTyreGridItem(
             TyreIconStateFlow.State.Alerting,
-            TyreStatsStateFlow.State.Alerting(3.2f.bar, BAR, 60f.celsius, CELSIUS),
+            TyreStatsStateFlow.State.Alerting(3.2f.bar, BAR, 60f.celsius, CELSIUS, 28u, now()),
         ).also { item ->
             assertEquals("Front left", item.title.toString())
             assertEquals("3.2b  60°C", item.text.toString())
@@ -96,7 +97,7 @@ internal class VehicleTemplateTest {
     fun normalTyreShowsItsLocationAndFormattedPressureWithTemperature() {
         singleTyreGridItem(
             TyreIconStateFlow.State.Normal.BlueToGreen(Fraction(0.5f)),
-            TyreStatsStateFlow.State.Normal(2.4f.bar, BAR, 22f.celsius, CELSIUS),
+            TyreStatsStateFlow.State.Normal(2.4f.bar, BAR, 22f.celsius, CELSIUS, 28u, now()),
         ).also { item ->
             assertEquals("Front left", item.title.toString())
             assertEquals("2.4b  22°C", item.text.toString())
