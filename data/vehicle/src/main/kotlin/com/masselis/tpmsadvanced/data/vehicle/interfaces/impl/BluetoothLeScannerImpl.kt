@@ -107,6 +107,7 @@ internal class BluetoothLeScannerImpl(
                 ?: RawWicarlink(it)
                 ?: RawBekubeeTpms(it)
                 ?: RawSysgration(it)
+                ?: RawVSafe(it)
                 ?: run {
                     logger.d("Sensor not parsed. Scan bytes: ${it.scanRecord?.bytes}")
                     null
@@ -151,7 +152,8 @@ internal class BluetoothLeScannerImpl(
             RawPecham.SERVICE_UUID,
             RawWicarlink.SERVICE_UUID,
             RawBekubeeKy.SERVICE_UUID,
-            RawBekubeeTpms.SERVICE_UUID
+            RawBekubeeTpms.SERVICE_UUID,
+            RawVSafe.SERVICE_UUID
         )
     }
 }

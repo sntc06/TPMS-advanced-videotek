@@ -17,6 +17,7 @@ internal fun mockScanRecord(
     containsServiceUuids: Boolean = true,
     mockAdvertiseFlags: Int = 0x06,
     mockManufacturerData: ByteArray = byteArrayOf(),
+    mockManufacturerDataKey: Int = 0,
     mockBytes: ByteArray = byteArrayOf(),
 ): ScanRecord = mockk {
     every { deviceName } returns mockDeviceName
@@ -26,9 +27,11 @@ internal fun mockScanRecord(
     every { advertiseFlags } returns mockAdvertiseFlags
     // Mocked company-id-agnostic, matching ScanRecord.manufacturerSpecificData: real sensors can
     // advertise the same payload under different company IDs, so decoders should read
-    // valueAt(0) rather than requiring a specific key.
+    // valueAt(0) rather than requiring a specific key. mockManufacturerDataKey lets a decoder
+    // that does check the company id (e.g. RawVSafe) be tested against a specific key too.
     every { manufacturerSpecificData } returns mockk {
         every { size() } returns 1
+        every { keyAt(0) } returns mockManufacturerDataKey
         every { valueAt(0) } returns mockManufacturerData
     }
     every { bytes } returns mockBytes
