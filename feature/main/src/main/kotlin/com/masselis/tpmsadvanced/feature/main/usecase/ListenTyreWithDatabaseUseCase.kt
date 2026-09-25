@@ -18,6 +18,10 @@ import kotlinx.coroutines.flow.flowOn
 import kotlinx.coroutines.flow.onEach
 import kotlinx.coroutines.flow.onStart
 import kotlinx.coroutines.flow.shareIn
+import kotlin.math.absoluteValue
+
+/** How long a reading holding steady stays out of the log before it's written again */
+private const val LOG_INTERVAL_SECONDS = 60.0
 
 internal interface ListenTyreWithDatabaseUseCase : ListenTyreUseCase {
     class Impl(
@@ -32,6 +36,9 @@ internal interface ListenTyreWithDatabaseUseCase : ListenTyreUseCase {
 
         /** The last reading written to [TyreLogDatabase], to avoid logging it again unchanged */
         private var lastLoggedReading: LoggedReading? = null
+
+        /** When [lastLoggedReading] was written, as carried by the reading itself */
+        private var lastLoggedAt: Double? = null
 
         /** [Tyre.Located] minus everything that isn't a sensor reading, notably the timestamp */
         private data class LoggedReading(
@@ -49,6 +56,7 @@ internal interface ListenTyreWithDatabaseUseCase : ListenTyreUseCase {
                     // So that switching logging back on always records the reading that follows,
                     // even when nothing changed while it was off
                     lastLoggedReading = null
+                    lastLoggedAt = null
                     return@onEach
                 }
                 val reading = LoggedReading(
@@ -57,12 +65,20 @@ internal interface ListenTyreWithDatabaseUseCase : ListenTyreUseCase {
                     tyre.temperature,
                     tyre.battery,
                 )
+                // The clock can be set either way, so read the distance, not the direction
+                val sinceLastLog = lastLoggedAt?.let { (tyre.timestamp - it).absoluteValue }
                 // A sensor broadcasts the same reading up to 10 times in a row and the scanner lets
                 // all of them through, since its own distinctUntilChanged compares the RSSI too and
                 // that moves between packets. Logging every one of them would fill the log with
-                // rows that only differ by a fraction of a second.
-                if (reading == lastLoggedReading) return@onEach
+                // rows that only differ by a fraction of a second. Keeping only what changed would
+                // leave a tyre that holds its pressure out of the log entirely though, which reads
+                // the same as a sensor that stopped reporting, hence the interval.
+                if (reading == lastLoggedReading &&
+                    sinceLastLog != null &&
+                    sinceLastLog < LOG_INTERVAL_SECONDS
+                ) return@onEach
                 lastLoggedReading = reading
+                lastLoggedAt = tyre.timestamp
                 tyreLogDatabase.insert(
                     tyre.timestamp,
                     tyre.sensorId,

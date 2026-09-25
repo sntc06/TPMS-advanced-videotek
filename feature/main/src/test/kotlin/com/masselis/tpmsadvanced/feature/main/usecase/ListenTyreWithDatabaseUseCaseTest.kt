@@ -152,9 +152,9 @@ internal class ListenTyreWithDatabaseUseCaseTest {
         every { logPreferences.enabled } returns MutableStateFlow(true)
         val reading =
             Tyre.Located(now(), -20, 1, 1f.bar, 1f.celsius, 50u, false, Location.Wheel(FRONT_LEFT))
-        // Same reading, as the scanner reports it: a fresh timestamp and a moving RSSI
+        // Same reading, as the scanner reports it: a burst about 100ms apart, with a moving RSSI
         val repeats = List(10) { index ->
-            reading.copy(timestamp = reading.timestamp + index, rssi = -20 - index)
+            reading.copy(timestamp = reading.timestamp + index.times(0.1), rssi = -20 - index)
         }
         every { listenTyreUseCase.listen() } returns repeats
             .asFlow()
@@ -191,6 +191,37 @@ internal class ListenTyreWithDatabaseUseCaseTest {
         }
         coVerify(exactly = 5) {
             tyreLogDatabase.insert(any(), any(), any(), any(), any(), any())
+        }
+        coroutineContext.cancelChildren()
+    }
+
+    /**
+     * Otherwise a tyre holding its pressure would stay out of the log entirely, which reads the
+     * same as a sensor that stopped reporting.
+     */
+    @Test
+    fun `an unchanged reading is logged again once the interval has passed`() = runTest {
+        every { logPreferences.enabled } returns MutableStateFlow(true)
+        val start = now()
+        val reading =
+            Tyre.Located(start, -20, 1, 1f.bar, 1f.celsius, 50u, false, Location.Wheel(FRONT_LEFT))
+        val emissions = listOf(0.0, 30.0, 59.0, 60.0, 90.0, 120.0)
+            .map { reading.copy(timestamp = start + it) }
+        every { listenTyreUseCase.listen() } returns emissions
+            .asFlow()
+            .onCompletion { awaitCancellation() }
+        test().listen().test {
+            emissions.forEach { assertEquals(it, awaitItem()) }
+        }
+        // The interval runs from the reading that was logged, not from the first one seen, so the
+        // one at 90 is held back while the one at 120 goes through
+        coVerify(exactly = 3) {
+            tyreLogDatabase.insert(any(), any(), any(), any(), any(), any())
+        }
+        listOf(start, start + 60.0, start + 120.0).forEach { timestamp ->
+            coVerify(exactly = 1) {
+                tyreLogDatabase.insert(timestamp, any(), any(), any(), any(), any())
+            }
         }
         coroutineContext.cancelChildren()
     }
