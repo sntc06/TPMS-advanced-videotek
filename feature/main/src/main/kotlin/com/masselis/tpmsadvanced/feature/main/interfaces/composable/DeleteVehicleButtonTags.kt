@@ -49,7 +49,7 @@ internal fun DeleteVehicleButton(
             enabled = state is State.DeletableVehicle,
             onClick = { showDeleteDialog = true },
             modifier = Modifier
-                .align(Alignment.TopEnd)
+                .align(Alignment.TopStart)
                 .testTag(tag),
         ) {
             Icon(ImageVector.vectorResource(id = R.drawable.delete_forever_outline), null)

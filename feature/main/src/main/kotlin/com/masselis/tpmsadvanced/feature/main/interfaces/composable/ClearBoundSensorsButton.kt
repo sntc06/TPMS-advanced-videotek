@@ -39,7 +39,7 @@ internal fun ClearBoundSensorsButton(
             enabled = state is State.ClearingPossible,
             onClick = { viewModel.clear() },
             modifier = Modifier
-                .align(Alignment.TopEnd)
+                .align(Alignment.TopStart)
                 .testTag(root),
         ) {
             Icon(ImageVector.vectorResource(id = R.drawable.link_variant_remove), null)

@@ -5,6 +5,7 @@ import android.widget.Toast
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.width
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.MaterialTheme
@@ -39,11 +40,11 @@ public fun LogSettings(
         Row(verticalAlignment = Alignment.CenterVertically) {
             Column(
                 modifier = Modifier.weight(1f),
-                horizontalAlignment = Alignment.End,
+                horizontalAlignment = Alignment.Start,
             ) {
                 Text(
                     text = if (enabled) "Tyre logging is enabled" else "Enable tyre logging",
-                    textAlign = TextAlign.End,
+                    textAlign = TextAlign.Start,
                 )
                 Text(
                     text = "Records pressure, temperature and battery readings to export as CSV",
@@ -56,6 +57,7 @@ public fun LogSettings(
                 onCheckedChange = { viewModel.enabled.value = it },
             )
         }
+        Spacer(Modifier.height(8.dp))
         OutlinedButton(
             onClick = {
                 viewModel.exportCsv(
@@ -76,13 +78,13 @@ public fun LogSettings(
                     )
                 }
             },
-            modifier = Modifier.align(Alignment.End),
+            modifier = Modifier.align(Alignment.Start),
         ) {
             Text("Export log as CSV")
         }
         OutlinedButton(
             onClick = { showClearDialog = true },
-            modifier = Modifier.align(Alignment.End),
+            modifier = Modifier.align(Alignment.Start),
         ) {
             Text("Clear log")
         }

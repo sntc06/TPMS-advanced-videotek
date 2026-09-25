@@ -31,14 +31,14 @@ internal fun DemoModeSwitch(
     ) {
         Column(
             modifier = Modifier.weight(1f),
-            horizontalAlignment = Alignment.End,
+            horizontalAlignment = Alignment.Start,
         ) {
             Text(
                 text = when (state) {
                     State.Disabled -> "Enable demo mode"
                     State.Enabled -> "Demo mode is enabled"
                 },
-                textAlign = TextAlign.End,
+                textAlign = TextAlign.Start,
             )
             Text(
                 text = "Triggers an application restart",
