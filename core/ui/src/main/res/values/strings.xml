@@ -1,0 +1,7 @@
+<resources>
+    <!--
+    Sits next to the spans DateUtils formats, which the system localizes, so this one is
+    translated too rather than hardcoded like the rest of the app's text
+    -->
+    <string name="relative_time_now">Now</string>
+</resources>
