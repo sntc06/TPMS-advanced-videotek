@@ -145,10 +145,10 @@ internal class ListenTyreWithDatabaseUseCaseTest {
     /**
      * A sensor broadcasts the same reading up to 10 times in a row, and the scanner lets all of
      * them through because its own `distinctUntilChanged` compares the RSSI too. Only the first one
-     * belongs in the log.
+     * is worth writing, to either table.
      */
     @Test
-    fun `a reading repeated by the sensor is logged once`() = runTest {
+    fun `a reading repeated by the sensor is written once`() = runTest {
         every { logPreferences.enabled } returns MutableStateFlow(true)
         val reading =
             Tyre.Located(now(), -20, 1, 1f.bar, 1f.celsius, 50u, false, Location.Wheel(FRONT_LEFT))
@@ -160,10 +160,11 @@ internal class ListenTyreWithDatabaseUseCaseTest {
             .asFlow()
             .onCompletion { awaitCancellation() }
         test().listen().test {
-            // Every repeat still reaches the UI, so the "last update" time keeps moving
+            // Every repeat still reaches the UI and the background monitoring, so the displayed
+            // update time keeps moving and an alert isn't held back
             repeats.forEach { assertEquals(it, awaitItem()) }
         }
-        coVerify(exactly = 10) { tyreDatabase.insert(any(), any()) }
+        coVerify(exactly = 1) { tyreDatabase.insert(any(), any()) }
         coVerify(exactly = 1) {
             tyreLogDatabase.insert(any(), any(), any(), any(), any(), any())
         }
@@ -222,6 +223,33 @@ internal class ListenTyreWithDatabaseUseCaseTest {
             coVerify(exactly = 1) {
                 tyreLogDatabase.insert(timestamp, any(), any(), any(), any(), any())
             }
+        }
+        coroutineContext.cancelChildren()
+    }
+
+    /**
+     * The cache only feeds the first value a collector sees, so it's written often enough to read
+     * as "now" when the app is opened again and no more than that. The log is kept lighter.
+     */
+    @Test
+    fun `an unchanged reading reaches the cache twice as often as the log`() = runTest {
+        every { logPreferences.enabled } returns MutableStateFlow(true)
+        val start = now()
+        val reading =
+            Tyre.Located(start, -20, 1, 1f.bar, 1f.celsius, 50u, false, Location.Wheel(FRONT_LEFT))
+        val emissions = listOf(0.0, 30.0, 60.0, 90.0)
+            .map { reading.copy(timestamp = start + it) }
+        every { listenTyreUseCase.listen() } returns emissions
+            .asFlow()
+            .onCompletion { awaitCancellation() }
+        test().listen().test {
+            emissions.forEach { assertEquals(it, awaitItem()) }
+        }
+        // Every 30 seconds for the cache, so all four
+        coVerify(exactly = 4) { tyreDatabase.insert(any(), any()) }
+        // Every minute for the log, so the ones at 0 and 60
+        coVerify(exactly = 2) {
+            tyreLogDatabase.insert(any(), any(), any(), any(), any(), any())
         }
         coroutineContext.cancelChildren()
     }

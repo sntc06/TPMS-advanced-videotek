@@ -23,6 +23,53 @@ import kotlin.math.absoluteValue
 /** How long a reading holding steady stays out of the log before it's written again */
 private const val LOG_INTERVAL_SECONDS = 60.0
 
+/**
+ * How long a reading holding steady stays out of the cache before it's written again. The cache
+ * only feeds the first value a collector sees, so writing every reading buys nothing beyond a
+ * timestamp that is worth keeping fresh enough to read as "now" when the app is opened again.
+ */
+private const val CACHE_INTERVAL_SECONDS = 30.0
+
+/**
+ * Lets a reading through when it reads differently from the last one it let through, or when that
+ * one is older than [intervalSeconds].
+ *
+ * A sensor broadcasts the same reading up to 10 times in a row and the scanner lets all of them
+ * through, since its own `distinctUntilChanged` compares the RSSI too and that moves between
+ * packets. Holding on to what changed alone would drop a tyre that keeps its pressure entirely
+ * though, which reads the same as a sensor that stopped reporting, hence the interval.
+ */
+private class ReadingThrottle(private val intervalSeconds: Double) {
+
+    private var last: Values? = null
+    private var lastAt: Double? = null
+
+    /** Whether [tyre] is worth writing. Remembers it when it is */
+    fun admits(tyre: Tyre.Located): Boolean {
+        val values = Values(tyre.sensorId, tyre.pressure, tyre.temperature, tyre.battery)
+        // The clock can be set either way, so read the distance, not the direction
+        val since = lastAt?.let { (tyre.timestamp - it).absoluteValue }
+        if (values == last && since != null && since < intervalSeconds) return false
+        last = values
+        lastAt = tyre.timestamp
+        return true
+    }
+
+    /** Drops what was remembered, so that the reading that follows is admitted whatever it holds */
+    fun forget() {
+        last = null
+        lastAt = null
+    }
+
+    /** [Tyre.Located] minus everything that isn't a sensor reading, notably the timestamp */
+    private data class Values(
+        val sensorId: Int,
+        val pressure: Pressure,
+        val temperature: Temperature,
+        val battery: UShort,
+    )
+}
+
 internal interface ListenTyreWithDatabaseUseCase : ListenTyreUseCase {
     class Impl(
         vehicle: Vehicle,
@@ -34,51 +81,24 @@ internal interface ListenTyreWithDatabaseUseCase : ListenTyreUseCase {
         scope: CoroutineScope,
     ) : ListenTyreWithDatabaseUseCase {
 
-        /** The last reading written to [TyreLogDatabase], to avoid logging it again unchanged */
-        private var lastLoggedReading: LoggedReading? = null
-
-        /** When [lastLoggedReading] was written, as carried by the reading itself */
-        private var lastLoggedAt: Double? = null
-
-        /** [Tyre.Located] minus everything that isn't a sensor reading, notably the timestamp */
-        private data class LoggedReading(
-            val sensorId: Int,
-            val pressure: Pressure,
-            val temperature: Temperature,
-            val battery: UShort,
-        )
+        private val cacheThrottle = ReadingThrottle(CACHE_INTERVAL_SECONDS)
+        private val logThrottle = ReadingThrottle(LOG_INTERVAL_SECONDS)
 
         private val flow = listenTyreUseCase
             .listen()
-            .onEach { tyre -> tyreDatabase.insert(tyre, vehicle.uuid) }
+            // Both writes are side effects, so every reading carries on downstream whether it gets
+            // written or not
+            .onEach { tyre ->
+                if (cacheThrottle.admits(tyre)) tyreDatabase.insert(tyre, vehicle.uuid)
+            }
             .onEach { tyre ->
                 if (logPreferences.enabled.value.not()) {
                     // So that switching logging back on always records the reading that follows,
                     // even when nothing changed while it was off
-                    lastLoggedReading = null
-                    lastLoggedAt = null
+                    logThrottle.forget()
                     return@onEach
                 }
-                val reading = LoggedReading(
-                    tyre.sensorId,
-                    tyre.pressure,
-                    tyre.temperature,
-                    tyre.battery,
-                )
-                // The clock can be set either way, so read the distance, not the direction
-                val sinceLastLog = lastLoggedAt?.let { (tyre.timestamp - it).absoluteValue }
-                // A sensor broadcasts the same reading up to 10 times in a row and the scanner lets
-                // all of them through, since its own distinctUntilChanged compares the RSSI too and
-                // that moves between packets. Logging every one of them would fill the log with
-                // rows that only differ by a fraction of a second. Keeping only what changed would
-                // leave a tyre that holds its pressure out of the log entirely though, which reads
-                // the same as a sensor that stopped reporting, hence the interval.
-                if (reading == lastLoggedReading &&
-                    sinceLastLog != null &&
-                    sinceLastLog < LOG_INTERVAL_SECONDS
-                ) return@onEach
-                lastLoggedReading = reading
-                lastLoggedAt = tyre.timestamp
+                if (logThrottle.admits(tyre).not()) return@onEach
                 tyreLogDatabase.insert(
                     tyre.timestamp,
                     tyre.sensorId,
