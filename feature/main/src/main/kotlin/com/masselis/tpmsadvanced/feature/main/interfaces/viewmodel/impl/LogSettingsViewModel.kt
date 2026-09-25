@@ -45,4 +45,15 @@ public class LogSettingsViewModel internal constructor(
             onExported(uri)
         }
     }
+
+    /**
+     * Deletes every tyre log entry, then reports how many were removed through [onCleared].
+     */
+    public fun clearLog(onCleared: (Long) -> Unit) {
+        viewModelScope.launch {
+            val count = tyreLogDatabase.count()
+            tyreLogDatabase.deleteAll()
+            onCleared(count)
+        }
+    }
 }
