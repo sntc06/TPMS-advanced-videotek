@@ -22,13 +22,17 @@ public class LogSettingsViewModel internal constructor(
     public val enabled: MutableStateFlow<Boolean> = logPreferences.enabled
 
     /**
-     * Writes the tyre log to a CSV file in the app's cache and returns a content [Uri] suitable
-     * for sharing (e.g. via `Intent.ACTION_SEND`), or null if there's nothing to export.
+     * Writes the tyre log to a CSV file in the app's cache and passes back a content [Uri]
+     * suitable for sharing (e.g. via `Intent.ACTION_SEND`) via [onExported], or invokes
+     * [onEmpty] if there's nothing to export yet.
      */
-    public fun exportCsv(onExported: (Uri) -> Unit) {
+    public fun exportCsv(onEmpty: () -> Unit = {}, onExported: (Uri) -> Unit) {
         viewModelScope.launch {
             val entries = tyreLogDatabase.selectAll()
-            if (entries.isEmpty()) return@launch
+            if (entries.isEmpty()) {
+                onEmpty()
+                return@launch
+            }
             val uri = withContext(IO) {
                 val file = File(context.cacheDir, "tyre_log.csv")
                 file.writeText(entries.toCsv())

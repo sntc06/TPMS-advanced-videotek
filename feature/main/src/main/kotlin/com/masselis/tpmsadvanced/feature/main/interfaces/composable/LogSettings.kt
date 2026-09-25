@@ -1,6 +1,7 @@
 package com.masselis.tpmsadvanced.feature.main.interfaces.composable
 
 import android.content.Intent
+import android.widget.Toast
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
@@ -51,7 +52,12 @@ public fun LogSettings(
         }
         OutlinedButton(
             onClick = {
-                viewModel.exportCsv { uri ->
+                viewModel.exportCsv(
+                    onEmpty = {
+                        Toast.makeText(context, "No tyre log data to export yet", Toast.LENGTH_LONG)
+                            .show()
+                    },
+                ) { uri ->
                     context.startActivity(
                         Intent.createChooser(
                             Intent(Intent.ACTION_SEND).apply {
