@@ -3,23 +3,28 @@ package com.masselis.tpmsadvanced.data.vehicle.interfaces
 import com.masselis.tpmsadvanced.data.vehicle.model.Pressure.CREATOR.bar
 import com.masselis.tpmsadvanced.data.vehicle.model.Temperature.CREATOR.celsius
 import org.junit.Test
+import java.time.ZoneId
 import kotlin.test.assertEquals
 
 internal class TyreLogCsvTest {
+
+    // Pinned so the rendered timestamps don't depend on where the tests run
+    private val taipei = ZoneId.of("Asia/Taipei")
 
     @Test
     fun `empty list only has the header`() {
         assertEquals(
             "timestamp,sensorId,vehicleName,pressureKpa,temperatureCelsius,batteryVolt\n",
-            emptyList<TyreLogDatabase.Entry>().toCsv()
+            emptyList<TyreLogDatabase.Entry>().toCsv(taipei)
         )
     }
 
     @Test
     fun `single entry is rendered as one row`() {
         val entry = TyreLogDatabase.Entry(
-            timestamp = 100.0,
-            sensorId = 12_814_446,
+            // 2026-09-24T08:00:00+08:00
+            timestamp = 1_790_208_000.0,
+            sensorId = 0xC35A6E,
             vehicleName = "My car",
             pressure = 2f.bar,
             temperature = 30f.celsius,
@@ -27,26 +32,49 @@ internal class TyreLogCsvTest {
         )
         assertEquals(
             "timestamp,sensorId,vehicleName,pressureKpa,temperatureCelsius,batteryVolt\n" +
-                "100.0,12814446,\"My car\",200.0,30.0,2.8\n",
-            listOf(entry).toCsv()
+                "2026-09-24T08:00:00+08:00,C35A6E,\"My car\",200.0,30.0,2.8\n",
+            listOf(entry).toCsv(taipei)
         )
     }
 
     @Test
-    fun `vehicle name with a comma and a quote is escaped`() {
-        val entry = TyreLogDatabase.Entry(
-            timestamp = 0.0,
-            sensorId = 1,
-            vehicleName = "Bob's \"fast\", red car",
-            pressure = 0f.bar,
-            temperature = 0f.celsius,
-            battery = 0u,
-        )
-        val csv = listOf(entry).toCsv()
+    fun `timestamp is rendered in the given zone`() {
+        val entry = entry(timestamp = 1_790_208_000.0)
         assertEquals(
-            "timestamp,sensorId,vehicleName,pressureKpa,temperatureCelsius,batteryVolt\n" +
-                "0.0,1,\"Bob's \"\"fast\"\", red car\",0.0,0.0,0.0\n",
-            csv
+            "2026-09-24T00:00:00Z",
+            entry.rowIn(ZoneId.of("UTC")).substringBefore(',')
+        )
+        assertEquals(
+            "2026-09-24T02:00:00+02:00",
+            entry.rowIn(ZoneId.of("Europe/Paris")).substringBefore(',')
+        )
+    }
+
+    /**
+     * A sensor is advertised and bound by hand as `C35A6E`, so that's how it has to show up here,
+     * rather than as the 12802670 the id happens to be as a number.
+     */
+    @Test
+    fun `sensor id is hexadecimal and padded to six digits`() {
+        assertEquals("C35A6E", entry(sensorId = 0xC35A6E).rowIn(taipei).split(',')[1])
+        assertEquals("000001", entry(sensorId = 1).rowIn(taipei).split(',')[1])
+    }
+
+    /**
+     * Sensors like [com.masselis.tpmsadvanced.data.vehicle.interfaces.impl.RawPecham] build their
+     * id out of a hash code, which can be negative. It has to survive as eight digits rather than
+     * being truncated to six.
+     */
+    @Test
+    fun `negative sensor id keeps all of its digits`() {
+        assertEquals("EBA61180", entry(sensorId = -341_438_080).rowIn(taipei).split(',')[1])
+    }
+
+    @Test
+    fun `vehicle name with a comma and a quote is escaped`() {
+        assertEquals(
+            "2026-09-24T08:00:00+08:00,C35A6E,\"Bob's \"\"fast\"\", red car\",0.0,0.0,0.0",
+            entry(vehicleName = "Bob's \"fast\", red car").rowIn(taipei)
         )
     }
 
@@ -56,6 +84,22 @@ internal class TyreLogCsvTest {
             TyreLogDatabase.Entry(1.0, 1, "Car A", 1f.bar, 1f.celsius, 10u),
             TyreLogDatabase.Entry(2.0, 2, "Car B", 2f.bar, 2f.celsius, 20u),
         )
-        assertEquals(3, entries.toCsv().lines().count { it.isNotEmpty() })
+        assertEquals(3, entries.toCsv(taipei).lines().count { it.isNotEmpty() })
     }
+
+    private fun entry(
+        timestamp: Double = 1_790_208_000.0,
+        sensorId: Int = 0xC35A6E,
+        vehicleName: String = "My car",
+    ) = TyreLogDatabase.Entry(
+        timestamp = timestamp,
+        sensorId = sensorId,
+        vehicleName = vehicleName,
+        pressure = 0f.bar,
+        temperature = 0f.celsius,
+        battery = 0u,
+    )
+
+    private fun TyreLogDatabase.Entry.rowIn(zone: ZoneId) =
+        listOf(this).toCsv(zone).lines()[1]
 }
