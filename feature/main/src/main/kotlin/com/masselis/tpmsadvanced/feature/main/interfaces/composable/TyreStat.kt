@@ -126,14 +126,10 @@ private fun TyreStat(
             modifier = Modifier.align(alignment),
         )
         Text(
-            battery?.let { "%.1fV".format(it.toInt() / VOLTAGE_UNITS_PER_VOLT) } ?: "-.-V",
-            maxLines = 1,
-            fontSize = 12.sp,
-            color = color,
-            modifier = Modifier.align(alignment),
-        )
-        Text(
-            timestamp?.let { relativeTimeSpanString(it) } ?: "",
+            listOfNotNull(
+                battery?.let { "%.1fV".format(it.toInt() / VOLTAGE_UNITS_PER_VOLT) },
+                timestamp?.let { relativeTimeSpanString(it) },
+            ).joinToString(", "),
             maxLines = 1,
             fontSize = 12.sp,
             color = color,
