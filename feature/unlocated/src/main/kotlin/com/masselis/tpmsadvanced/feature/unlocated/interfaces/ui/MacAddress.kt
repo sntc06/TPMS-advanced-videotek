@@ -18,7 +18,7 @@ internal fun String.toSensorIdOrNull(): Int? {
         .chunked(2)
         .map { it.toIntOrNull(radix = 16) ?: return null }
     val (b0, b1, b2) = bytes.takeLast(3)
-    return b0 or (b1 shl BYTE_BITS) or (b2 shl (2 * BYTE_BITS))
+    return (b0 shl (2 * BYTE_BITS)) or (b1 shl BYTE_BITS) or b2
 }
 
 private const val MAC_ADDRESS_HEX_LENGTH = 12
