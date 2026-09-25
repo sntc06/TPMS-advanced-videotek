@@ -251,7 +251,7 @@ private fun Searching(
                 bindingFinished = bindingFinished
             )
 
-        manualMacEntry(onBind = setTyreToBind)
+        manualSensorIdEntry(onBind = setTyreToBind)
     }
     if (tyreToBind != null)
         BindDialog(
@@ -263,39 +263,46 @@ private fun Searching(
 }
 
 /**
- * Lets the user bind a sensor by typing its full Bluetooth MAC address instead of waiting for it
- * to be seen over the air. Only the last 3 bytes are used to compute the sensor id (the same way
- * [com.masselis.tpmsadvanced.data.vehicle.interfaces.impl.RawVSafe] derives it from a scanned
- * advertisement), so the first 3 bytes (the OUI) don't need to be accurate. Useful to test binding
- * without having the physical sensor at hand, or to pre-bind a sensor before it's ever scanned.
+ * Lets the user bind a V-SAFE BT1 sensor by typing its id instead of waiting for it to be seen
+ * over the air. The id is the `C35A6E` part of the `TPMS_C35A6E` name the sensor advertises, which
+ * is also the tail of its MAC address, so a full MAC address is accepted as well. Useful to test
+ * binding without having the physical sensor at hand, or to pre-bind a sensor before it's ever
+ * scanned.
  */
-private fun LazyListScope.manualMacEntry(
+private fun LazyListScope.manualSensorIdEntry(
     onBind: (Tyre) -> Unit,
 ) {
     item { Spacer(Modifier.height(24.dp)) }
     item {
         Text(
-            text = "Or bind by typing a MAC address:",
+            text = "Or bind a V-SAFE BT1 sensor by typing its id:",
             fontSize = 12.sp,
+        )
+    }
+    item {
+        Text(
+            text = "The 6 characters after \"TPMS_\" in the name it advertises. " +
+                    "A full MAC address works too.",
+            fontSize = 11.sp,
         )
     }
     item { Spacer(Modifier.height(8.dp)) }
     item {
-        var macAddress by rememberSaveable { mutableStateOf("") }
-        val sensorId = remember(macAddress) { macAddress.toSensorIdOrNull() }
+        var typedId by rememberSaveable { mutableStateOf("") }
+        val sensorId = remember(typedId) { typedId.toSensorIdOrNull() }
         Row(
             verticalAlignment = Alignment.CenterVertically,
             modifier = Modifier.fillMaxWidth()
         ) {
             OutlinedTextField(
-                value = macAddress,
-                onValueChange = { macAddress = it },
-                label = { Text("AA:BB:CC:DD:EE:FF") },
-                isError = macAddress.isNotEmpty() && sensorId == null,
+                value = typedId,
+                onValueChange = { typedId = it },
+                label = { Text("C35A6E") },
+                isError = typedId.isNotEmpty() && sensorId == null,
                 singleLine = true,
                 modifier = Modifier
                     .weight(1f)
-                    .testTag(UnlocatedSensorListTags.manualMacAddressField)
+                    .testTag(UnlocatedSensorListTags.manualSensorIdField)
             )
             Spacer(Modifier.width(8.dp))
             Button(
@@ -313,7 +320,7 @@ private fun LazyListScope.manualMacEntry(
                         )
                     )
                 },
-                modifier = Modifier.testTag(UnlocatedSensorListTags.manualMacAddressBindButton)
+                modifier = Modifier.testTag(UnlocatedSensorListTags.manualSensorIdBindButton)
             ) {
                 Text("Bind")
             }
@@ -913,6 +920,6 @@ internal object UnlocatedSensorListTags {
     fun tyreCell(sensorId: Int) = "UnlocatedSensorListTags_tyreCell_$sensorId"
     fun boundCell(sensorId: Int) = "UnlocatedSensorListTags_boundCell_$sensorId"
     const val bindingFinishedGoBackButton = "UnlocatedSensorListTags_bindingFinishedGoBackButton"
-    const val manualMacAddressField = "UnlocatedSensorListTags_manualMacAddressField"
-    const val manualMacAddressBindButton = "UnlocatedSensorListTags_manualMacAddressBindButton"
+    const val manualSensorIdField = "UnlocatedSensorListTags_manualSensorIdField"
+    const val manualSensorIdBindButton = "UnlocatedSensorListTags_manualSensorIdBindButton"
 }
