@@ -22,6 +22,7 @@ import kotlinx.coroutines.cancelChildren
 import kotlinx.coroutines.flow.MutableSharedFlow
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.asFlow
+import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.flow.onCompletion
 import kotlinx.coroutines.test.runTest
 import org.junit.Before
@@ -137,6 +138,94 @@ internal class ListenTyreWithDatabaseUseCaseTest {
                 tyreToEmit.temperature,
                 tyreToEmit.battery,
             )
+        }
+        coroutineContext.cancelChildren()
+    }
+
+    /**
+     * A sensor broadcasts the same reading up to 10 times in a row, and the scanner lets all of
+     * them through because its own `distinctUntilChanged` compares the RSSI too. Only the first one
+     * belongs in the log.
+     */
+    @Test
+    fun `a reading repeated by the sensor is logged once`() = runTest {
+        every { logPreferences.enabled } returns MutableStateFlow(true)
+        val reading =
+            Tyre.Located(now(), -20, 1, 1f.bar, 1f.celsius, 50u, false, Location.Wheel(FRONT_LEFT))
+        // Same reading, as the scanner reports it: a fresh timestamp and a moving RSSI
+        val repeats = List(10) { index ->
+            reading.copy(timestamp = reading.timestamp + index, rssi = -20 - index)
+        }
+        every { listenTyreUseCase.listen() } returns repeats
+            .asFlow()
+            .onCompletion { awaitCancellation() }
+        test().listen().test {
+            // Every repeat still reaches the UI, so the "last update" time keeps moving
+            repeats.forEach { assertEquals(it, awaitItem()) }
+        }
+        coVerify(exactly = 10) { tyreDatabase.insert(any(), any()) }
+        coVerify(exactly = 1) {
+            tyreLogDatabase.insert(any(), any(), any(), any(), any(), any())
+        }
+        coroutineContext.cancelChildren()
+    }
+
+    @Test
+    fun `a reading is logged again once any of its values changes`() = runTest {
+        every { logPreferences.enabled } returns MutableStateFlow(true)
+        val first =
+            Tyre.Located(now(), -20, 1, 1f.bar, 1f.celsius, 50u, false, Location.Wheel(FRONT_LEFT))
+        val emissions = listOf(
+            first,
+            first.copy(pressure = 2f.bar),
+            first.copy(pressure = 2f.bar, temperature = 2f.celsius),
+            first.copy(pressure = 2f.bar, temperature = 2f.celsius, battery = 49u),
+            // Back to a value already seen, but not the one logged last
+            first,
+        )
+        every { listenTyreUseCase.listen() } returns emissions
+            .asFlow()
+            .onCompletion { awaitCancellation() }
+        test().listen().test {
+            emissions.forEach { assertEquals(it, awaitItem()) }
+        }
+        coVerify(exactly = 5) {
+            tyreLogDatabase.insert(any(), any(), any(), any(), any(), any())
+        }
+        coroutineContext.cancelChildren()
+    }
+
+    /**
+     * Otherwise nothing would be logged after switching logging back on until a value happened to
+     * change, which reads as the feature being broken.
+     */
+    @Test
+    fun `switching logging off and on logs the next reading even when unchanged`() = runTest {
+        val enabled = MutableStateFlow(true)
+        every { logPreferences.enabled } returns enabled
+        val reading =
+            Tyre.Located(now(), -20, 1, 1f.bar, 1f.celsius, 50u, false, Location.Wheel(FRONT_LEFT))
+        val emissions = MutableSharedFlow<Tyre.Located>(replay = 0)
+        every { listenTyreUseCase.listen() } returns emissions
+        test().listen().test {
+            // shareIn only attaches upstream once something collects, and a replayless
+            // MutableSharedFlow drops whatever is emitted before that
+            emissions.subscriptionCount.first { it > 0 }
+
+            emissions.emit(reading)
+            awaitItem()
+
+            enabled.value = false
+            emissions.emit(reading)
+            awaitItem()
+
+            enabled.value = true
+            emissions.emit(reading)
+            awaitItem()
+        }
+        // Once before switching off, once after switching back on
+        coVerify(exactly = 2) {
+            tyreLogDatabase.insert(any(), any(), any(), any(), any(), any())
         }
         coroutineContext.cancelChildren()
     }
