@@ -5,6 +5,7 @@ package com.masselis.tpmsadvanced.feature.main.interfaces.composable
 import android.content.ActivityNotFoundException
 import android.content.Intent
 import android.content.Intent.ACTION_VIEW
+import android.content.res.Configuration
 import android.net.Uri
 import android.widget.Toast
 import androidx.compose.foundation.Image
@@ -23,6 +24,7 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.ColorFilter
 import androidx.compose.ui.graphics.ImageBitmap
+import androidx.compose.ui.platform.LocalConfiguration
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.imageResource
 import androidx.compose.ui.text.font.FontWeight
@@ -324,6 +326,8 @@ private fun Motorcycle(
     modifier: Modifier = Modifier
 ) {
     ConstraintLayout(modifier = modifier) {
+        val isLandscape =
+            LocalConfiguration.current.orientation == Configuration.ORIENTATION_LANDSCAPE
         val (
             vehicleImage,
             tyreBox,
@@ -370,8 +374,17 @@ private fun Motorcycle(
             TyreStat(
                 location = this,
                 modifier = Modifier.constrainAs(frontStats) {
-                    centerHorizontallyTo(tyreFront)
-                    bottom.linkTo(vehicleImage.top, 8.dp)
+                    if (isLandscape) {
+                        // There isn't enough room above the vehicle image in landscape, so the
+                        // stats go next to it instead. They're anchored to the image rather than
+                        // to the tyre to avoid overlapping the handlebars.
+                        top.linkTo(tyreFront.top)
+                        bottom.linkTo(tyreFront.bottom)
+                        start.linkTo(vehicleImage.end, 8.dp)
+                    } else {
+                        centerHorizontallyTo(tyreFront)
+                        bottom.linkTo(vehicleImage.top, 8.dp)
+                    }
                 }
             )
             BindSensorButton(
@@ -399,8 +412,14 @@ private fun Motorcycle(
             TyreStat(
                 location = this,
                 modifier = Modifier.constrainAs(rearStats) {
-                    centerHorizontallyTo(tyreRear)
-                    top.linkTo(vehicleImage.bottom, 8.dp)
+                    if (isLandscape) {
+                        top.linkTo(tyreRear.top)
+                        bottom.linkTo(tyreRear.bottom)
+                        start.linkTo(vehicleImage.end, 8.dp)
+                    } else {
+                        centerHorizontallyTo(tyreRear)
+                        top.linkTo(vehicleImage.bottom, 8.dp)
+                    }
                 }
             )
             BindSensorButton(
