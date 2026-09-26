@@ -288,6 +288,70 @@ stack[sp+0x28] = payload[9]                                     → 對應 Kotli
 ### 額外發現：`status` 這個 varargs slot 疑似未初始化
 `[sp+0x10]`（對應 Kotlin 的 `status` 參數）在我們實際走的分支中，找不到任何 `str` 指令寫入這個位置——它會是呼叫前殘留在該 stack 位置的垂死值（可能是前一次函式呼叫留下的雜訊，不可預期）。這解釋了為何先前粗略猜測「`status_nibble = payload[0]&0xF = 12`」會超出 `Config.DeviceState` enum 範圍：**這個猜測本來就是錯的，`status` 根本不是從 `payload[0]` 算出來的，而是這條程式路徑裡疑似的未初始化/未設定變數**。若這個猜測成立，代表 App 在「未加密模式」下收到的 `status` 值本質上是不可靠的垂死資料，`ScanServiceManager.java` 裡任何依賴 `status` 做告警判斷的邏輯，在此模式下可能實際上永遠不會觸發、或觸發行為不可預期。這點如果要繼續深挖，需要交叉比對 App 在「正常/漏氣/低電量」等不同 UI 狀態下實際收到的封包，確認 status 是否真的沒被好好賦值，或者是編譯器最佳化把某條賦值路徑合併到別處（本分析只看了一條反組譯路徑，不能100%排除這種可能）。
 
+## 12. 原廠 App 的掃描過濾層（2026-09-26，由「clone 封包原廠收不到」現象反查）
+
+起因：用 nRF Connect 的 clone 功能從另一支手機發送複製的廣播封包，TPMS-advanced 收得到並正常顯示，**原廠 App 完全沒反應**。以下是 `TpmsScan.onScanResult`（`com/pingwang/tpmslibrary/TpmsScan.java`）的四道關卡，依執行順序排列。
+
+### 關卡一：`ScanFilter` 過濾 Service UUID（硬體層，可被卸載）
+```java
+ScanFilter scanFilterBuild  = new ScanFilter.Builder().setServiceUuid(adUuid1).build();  // FBB0
+ScanFilter scanFilterBuild2 = new ScanFilter.Builder().setServiceUuid(adUuid2).build();  // FBC0
+ScanSettings scanSettingsBuild = new ScanSettings.Builder().setScanMode(2).build();
+bluetoothLeScanner.startScan(listOf(scanFilterBuild, scanFilterBuild2), scanSettingsBuild, scanCallback);
+```
+`ScanFilter` 會在支援的晶片上下放到藍牙控制器執行（`BluetoothAdapter.isOffloadedFilteringSupported()`），不符合的封包不會喚醒應用處理器。**原廠只用 service UUID 過濾，沒有用 `setDeviceAddress()`**，這點很關鍵，見關卡二。
+
+### 關卡二：MAC 白名單（軟體層）— 這是 clone 封包被丟棄的真正原因
+```java
+String deviceId = tpmsScan.getDeviceId(device.getAddress());   // ← 取自真實 BLE MAC
+String[] strArr = tpmsList;
+if (strArr != null) {
+    if ((!(strArr.length == 0)) && !ArraysKt.contains(strArr, deviceId)) {
+        return;                                                 // ← 直接丟棄
+    }
+}
+```
+`getDeviceId()` 把 MAC 用 `:` 切開後取第 4 到第 6 段串接（`for (int i = 3; i < length; i++)`），所以 `03:B3:EC:C3:5A:6E` → `C35A6E`（見第 1 節）。
+
+**原廠 App 的感測器身分認定來源是廣播端的真實 MAC 位址，不是封包內容。** 用手機 clone 時 `manufacturerData` 可以完全複製，但廣播端 MAC 是那支手機的（Android 預設還會用隨機的 resolvable private address），算出的 `deviceId` 不在白名單內，封包在進入 native 解析之前就被丟掉。
+
+這同時說明 `manufacturerData[9..11]`（MAC 末 3 bytes 反序，見第 2 節）對原廠 App 而言是**冗餘資訊**——它從來不讀這三個 byte，直接用 MAC。推測這三個 byte 是留給不方便取得 MAC 的平台使用。
+
+**對我們的實作的意義**：`RawVSafe.id()` 是從 `manufacturerData[9..11]` 取 ID，不依賴 MAC，所以 clone 的封包我們收得到。這讓「用另一支手機模擬感測器」成為可用的測試手段，可以重現低電量、高胎壓等不易在真車上製造的情境，不需要真實感測器在場。反之，若要讓原廠 App 也收到模擬封包，必須讓廣播端 MAC 末 3 bytes 等於目標 ID——Android 應用層無法指定廣播 MAC，需改用 ESP32（`esp_base_mac_addr_set`）或 nRF52 這類可設定 MAC 的硬體，並記得一併廣播裝置名稱（見關卡三）。
+
+### 關卡三：`deviceName` 不可為 null，否則拋例外
+```java
+String deviceName = device2.getName();
+...
+Intrinsics.checkExpressionValueIsNotNull(deviceName, "deviceName");
+tpmsScan2.parse(mac, deviceId, rssi, bArr2, length, deviceName);
+```
+`Intrinsics.checkExpressionValueIsNotNull` 在值為 null 時丟出 `IllegalStateException`（已從 `kotlin/jvm/internal/Intrinsics.java:82-86` 確認），**不是安靜跳過**。裝置名稱常放在 scan response 而非 advertisement，clone 工具不一定會複製；真實感測器的廣播名稱形如 `TPMS_C35A6E`。
+
+順帶一提這是原廠 App 的真實缺陷：任何沒有名稱的 BLE 廣播都能讓它的掃描回呼拋例外。
+
+### 關卡四：長度檢查
+```java
+int length = bArr.length + 2;      // +2 是前置的 company id
+if (length < 11) return;
+```
+即 `manufacturerData` 至少 9 bytes。BT1 實際有 12 bytes，這關不會擋。
+
+### 掃描模式對比（與耗電相關，非過濾）
+| | 原廠 App | TPMS-advanced |
+|---|---|---|
+| `ScanFilter` | 2 個 service UUID | 6 個 service UUID（六種品牌） |
+| 硬體 MAC 過濾 | 未使用 | 未使用 |
+| 感測器身分來源 | `device.getAddress()`（軟體比對） | `manufacturerData[9..11]` |
+| 掃描模式 | 寫死 `SCAN_MODE_LOW_LATENCY` | 首筆讀數用 `LOW_LATENCY`，之後降為 `SCAN_MODE_BALANCED`（`ListenTyreSmartDutyUseCase`） |
+
+AOSP 中 `LOW_LATENCY` 的 scan window 等於 scan interval（5000ms / 5000ms，100% duty cycle），收音機持續開啟；`BALANCED` 約 2000ms / 5000ms。原廠全程維持在最耗電的模式。
+
+兩邊的身分判定都在軟體層，成本都可忽略（讀字串欄位做比對 vs 讀三個 byte 做位元運算），**payload 取 ID 沒有效能代價**。
+
+補充一個與背景監控相關的限制：**Android 8.1 起，未帶 `ScanFilter` 的掃描在螢幕關閉時會被系統擋掉**，所以傳 filter 不只是省電考量，而是背景運作的必要條件。兩邊都有傳。
+
+
 
 
 
