@@ -23,10 +23,23 @@ the [Play Store](https://play.google.com/store/apps/details?id=com.masselis.tpms
 * Run in background
 * Shortcut to access directly to the vehicle
 
+## Added by this fork
+
+Support for the V-SAFE BT1 sensor (Videotek), alongside the sensors listed below, and what came with
+reading it:
+
+* Battery voltage and how long ago a reading arrived, next to its pressure and temperature
+* Tyre logging, exported as a CSV of every reading taken
+* Binding a sensor by typing its id, for a sensor a scan can't place on a wheel by itself
+* Motorcycle stats no longer cut off in landscape
+* Pressure and temperature no longer rounded to a whole unit
+
+The sensor's protocol is written up in [vsafe-bt1-protocol.md](vsafe-bt1-protocol.md), along with how
+the vendor's own app reads a scan result differently.
+
 ## What's next ?
 
 * Battery alerts
-* Last time update
 * Temperature history
 * Automatic startup in background when connected to the car's radio in bluetooth
 * Add support for other BLE Sensors
